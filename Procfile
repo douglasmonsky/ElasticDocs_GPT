@@ -1,1 +1,1 @@
-web: streamlit run app.py
+web: streamlit run elasticdocs_gpt.py
