@@ -67,8 +67,13 @@ def search(query_text: str) -> tuple[str, str]:
                      size=1,
                      source=False)
     print(resp)
-    body = resp['hits']['hits'][0]['fields']['body_content'][0]
-    url = resp['hits']['hits'][0]['fields']['url'][0]
+    try:
+        body = resp['hits']['hits'][0]['fields']['body_content'][0]
+        url = resp['hits']['hits'][0]['fields']['url'][0]
+    except IndexError:
+        no_result_message = "No results found"
+        body = no_result_message
+        url = no_result_message
 
     return body, url
 
@@ -105,11 +110,14 @@ with st.form("chat_form"):
 negResponse = "I'm unable to answer the question based on the information I have from Elastic Docs."
 if submit_button:
     resp, url = search(query)
-    prompt = f"Answer this question: {query}\nUsing only the information from this Elastic Doc:" \
-             f" {resp}\nIf the answer is not contained in the supplied doc reply '{negResponse}' and nothing else"
-    answer = chat_gpt(prompt)
-
-    if negResponse in answer:
-        st.write(f"ChatGPT: {answer.strip()}")
+    if resp == "No results found":
+        st.write(f"ChatGPT: {negResponse}")
     else:
-        st.write(f"ChatGPT: {answer.strip()}\n\nDocs: {url}")
+        prompt = f"Answer this question: {query}\nUsing only the information from this Elastic Doc:" \
+                 f" {resp}\nIf the answer is not contained in the supplied doc reply '{negResponse}' and nothing else"
+        answer = chat_gpt(prompt)
+
+        if negResponse in answer:
+            st.write(f"ChatGPT: {answer.strip()}")
+        else:
+            st.write(f"ChatGPT: {answer.strip()}\n\nDocs: {url}")
