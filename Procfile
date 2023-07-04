@@ -1,1 +1,1 @@
-web: streamlit run elasticdocs_gpt.py
+web: sh setup.sh && streamlit run elasticdocs_gpt.py
