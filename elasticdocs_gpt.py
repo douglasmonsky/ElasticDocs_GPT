@@ -2,36 +2,29 @@ import os
 import streamlit as st
 import openai
 from elasticsearch import Elasticsearch
+from dotenv import load_dotenv
 
-# This code is part of an Elastic Blog showing how to combine
-# Elasticsearch's search relevancy power with 
-# OpenAI's GPT's Question Answering power
 # https://www.elastic.co/blog/chatgpt-elasticsearch-openai-meets-private-data
-
-# Code is presented for demo purposes but should not be used in production
-# You may encounter exceptions which are not handled in the code
-
+load_dotenv()
 
 # Required Environment Variables
-# openai_api - OpenAI API Key
-# cloud_id - Elastic Cloud Deployment ID
-# cloud_user - Elasticsearch Cluster User
-# cloud_pass - Elasticsearch User Password
+es_cloud_id = os.getenv('ES_CLOUD_ID')
+es_user = os.getenv('ES_USER')
+es_pass = os.getenv('ES_PASS')
 
-openai.api_key = os.environ['openai_api']
-model = "gpt-3.5-turbo-0301"
+openai.api_key = os.getenv('OPENAI_API_KEY')
+model = "gpt-4"
+
 
 # Connect to Elastic Cloud cluster
-def es_connect(cid, user, passwd):
-    es = Elasticsearch(cloud_id=cid, http_auth=(user, passwd))
+def es_connect(cid: str, user: str, passwd: str) -> Elasticsearch:
+    es = Elasticsearch(cloud_id=cid, basic_auth=(user, passwd))
     return es
 
+
 # Search ElasticSearch index and return body and URL of the result
-def search(query_text):
-    cid = os.environ['cloud_id']
-    cp = os.environ['cloud_pass']
-    cu = os.environ['cloud_user']
-    es = es_connect(cid, cu, cp)
+def search(query_text: str) -> tuple[str, str]:
+    es = es_connect(es_cloud_id, es_user, es_pass)
 
     # Elasticsearch query (BM25) and kNN configuration for hybrid search
     query = {
@@ -46,7 +39,7 @@ def search(query_text):
             }],
             "filter": [{
                 "exists": {
-                    "field": "title-vector"
+                    "field": "elastic-docs_title-vector"
                 }
             }]
         }
@@ -64,7 +57,7 @@ def search(query_text):
         },
         "boost": 24
     }
-
+    print(knn)
     fields = ["title", "body_content", "url"]
     index = 'search-elastic-docs'
     resp = es.search(index=index,
@@ -73,26 +66,30 @@ def search(query_text):
                      fields=fields,
                      size=1,
                      source=False)
-
+    print(resp)
     body = resp['hits']['hits'][0]['fields']['body_content'][0]
     url = resp['hits']['hits'][0]['fields']['url'][0]
 
     return body, url
 
-def truncate_text(text, max_tokens):
+
+def truncate_text(text: str, max_tokens: int) -> str:
     tokens = text.split()
     if len(tokens) <= max_tokens:
         return text
 
     return ' '.join(tokens[:max_tokens])
 
+
 # Generate a response from ChatGPT based on the given prompt
-def chat_gpt(prompt, model="gpt-3.5-turbo", max_tokens=1024, max_context_tokens=4000, safety_margin=5):
+def chat_gpt(prompt: str, model: str = "gpt-4", max_tokens: int = 1024,
+             max_context_tokens: int = 4000, safety_margin: int = 5) -> str:
     # Truncate the prompt content to fit within the model's context length
     truncated_prompt = truncate_text(prompt, max_context_tokens - max_tokens - safety_margin)
 
     response = openai.ChatCompletion.create(model=model,
-                                            messages=[{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": truncated_prompt}])
+                                            messages=[{"role": "system", "content": "You are a helpful assistant."},
+                                                      {"role": "user", "content": truncated_prompt}])
 
     return response["choices"][0]["message"]["content"]
 
@@ -108,9 +105,10 @@ with st.form("chat_form"):
 negResponse = "I'm unable to answer the question based on the information I have from Elastic Docs."
 if submit_button:
     resp, url = search(query)
-    prompt = f"Answer this question: {query}\nUsing only the information from this Elastic Doc: {resp}\nIf the answer is not contained in the supplied doc reply '{negResponse}' and nothing else"
+    prompt = f"Answer this question: {query}\nUsing only the information from this Elastic Doc:" \
+             f" {resp}\nIf the answer is not contained in the supplied doc reply '{negResponse}' and nothing else"
     answer = chat_gpt(prompt)
-    
+
     if negResponse in answer:
         st.write(f"ChatGPT: {answer.strip()}")
     else:
