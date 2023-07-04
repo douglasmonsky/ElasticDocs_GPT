@@ -4,3 +4,4 @@
 venv
 main-notokenlimit.py
 .env
+.idea
