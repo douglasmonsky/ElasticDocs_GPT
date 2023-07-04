@@ -5,6 +5,8 @@ from elasticsearch import Elasticsearch
 from dotenv import load_dotenv
 
 # https://www.elastic.co/blog/chatgpt-elasticsearch-openai-meets-private-data
+# Example search query: "Show me the API call for an inference processor"
+
 load_dotenv()
 
 # Required Environment Variables
